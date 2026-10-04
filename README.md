@@ -1,2 +1,2 @@
 # manhunt
-A Irl Manhunt Rust Server
+A Irl Manhunt Rust Server made with AI
