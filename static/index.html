@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Manhunt">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon.png">
+<link rel="icon" href="/icon.png">
+<title>Manhunt</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--paper:#fff;--ink:#16181d;--mute:#6c7280;--red:#e1111b;--tint:#fdeced;--line:#e3e5e9}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);overscroll-behavior:none;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit}
+#map{position:fixed;inset:0;background:#e9e7e2}
+.leaflet-top{top:calc(env(safe-area-inset-top) + 58px)}
+.leaflet-control-attribution{font-size:9px}
+
+/* Kopfzeile */
+#top{position:fixed;z-index:1000;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 10px);
+  display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.tag{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:9px 13px;font-size:14px;
+  font-weight:600;display:flex;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--red)}
+.dot.ok{background:#1a9b4b}
+
+/* Steuerblatt unten */
+#sheet{position:fixed;z-index:1000;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;background:var(--paper);
+  border-radius:22px 22px 0 0;box-shadow:0 -6px 28px rgba(0,0,0,.18);padding:0 20px calc(env(safe-area-inset-bottom) + 18px)}
+#grab{padding:10px 0 8px;cursor:pointer}
+#grab::after{content:"";display:block;width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+#dl{font-size:60px;line-height:1;font-weight:800;letter-spacing:-.045em}
+#dl.live{color:var(--red)}
+#note{margin-top:6px;font-size:14px;color:var(--mute);max-width:26ch;line-height:1.3}
+#loc{flex:none;width:48px;height:48px;border-radius:14px;border:1px solid var(--line);background:var(--paper);
+  display:grid;place-items:center}
+#loc:active{background:var(--tint)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:36px;background:transparent;margin:16px 0 6px;--p:0%}
+input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:5px;
+  background:linear-gradient(to right,var(--red) var(--p),var(--line) var(--p))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;margin-top:-11px;border-radius:50%;
+  background:var(--paper);border:3px solid var(--red);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+input[type=range]::-moz-range-track{height:10px;border-radius:5px;background:var(--line)}
+input[type=range]::-moz-range-progress{height:10px;border-radius:5px;background:var(--red)}
+input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--paper);border:3px solid var(--red)}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.seg button{border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:11px 0;font-size:15px;font-weight:600}
+.seg button.on{background:var(--red);border-color:var(--red);color:#fff}
+#who{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+#who::-webkit-scrollbar{display:none}
+#who:empty{display:none}
+.p{flex:none;border:1px solid var(--line);background:var(--paper);border-radius:12px;padding:8px 12px;font-size:14px;
+  font-weight:600;display:flex;align-items:center;gap:8px}
+.p i{width:9px;height:9px;border-radius:50%;background:var(--red)}
+.p small{font-weight:500;color:var(--mute);font-size:13px}
+#sheet.min #body{display:none}
+
+/* Marker */
+.mk{position:relative;width:0;height:0}
+.mk i{position:absolute;left:-10px;top:-10px;width:20px;height:20px;border-radius:50%;background:var(--c);
+  border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.45)}
+.mk span{position:absolute;top:14px;left:0;transform:translateX(-50%);white-space:nowrap;background:#fff;color:var(--ink);
+  font:700 12px -apple-system,system-ui,sans-serif;padding:3px 8px;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
+.mk.me i::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:2px solid var(--c);animation:pulse 2.2s infinite}
+@keyframes pulse{from{transform:scale(.6);opacity:1}to{transform:scale(1.7);opacity:0}}
+@media (prefers-reduced-motion:reduce){.mk.me i::after{animation:none}}
+
+/* Anmeldung */
+#login{position:fixed;inset:0;z-index:3000;background:var(--paper);display:flex;align-items:center;padding:28px}
+#login .wrap{width:100%;max-width:420px;margin:0 auto}
+#login .mark{width:64px;height:64px;border-radius:50%;background:var(--red);display:grid;place-items:center;margin-bottom:28px}
+#login .mark::after{content:"";width:22px;height:22px;border-radius:50%;background:#fff}
+#login h1{margin:0;font-size:46px;letter-spacing:-.04em;font-weight:800}
+#login p{margin:8px 0 28px;font-size:17px;color:var(--mute)}
+#login input{width:100%;padding:14px 0;font-size:24px;font-weight:600;border:0;border-bottom:3px solid var(--ink);
+  outline:0;border-radius:0;background:transparent;color:var(--ink);-webkit-user-select:text;user-select:text}
+#login input:focus{border-color:var(--red)}
+#login button{width:100%;margin-top:28px;padding:17px;font-size:18px;font-weight:700;border:0;border-radius:14px;
+  background:var(--red);color:#fff}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="top">
+  <div class="tag"><span class="dot" id="gdot"></span><span id="gtxt">Standort wird gesucht</span></div>
+  <div class="tag" id="cnt">0 Spieler</div>
+</div>
+<div id="sheet">
+  <div id="grab" title="Ein- und ausklappen"></div>
+  <div class="head">
+    <div><div id="dl" class="live">Live</div><div id="note">Die anderen sehen dich in Echtzeit.</div></div>
+    <button id="loc" aria-label="Auf mich zentrieren">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+    </button>
+  </div>
+  <div id="body">
+    <input id="slider" type="range" min="0" max="900" step="10" value="0" aria-label="Meine Verzögerung">
+    <div class="seg" id="presets"></div>
+    <div id="who"></div>
+  </div>
+</div>
+<div id="login"><div class="wrap">
+  <div class="mark"></div>
+  <h1>Manhunt</h1><p>Wie sollen dich die anderen nennen?</p>
+  <input id="nameIn" maxlength="30" autocomplete="off" autocapitalize="words" placeholder="Dein Name">
+  <button id="go">Spiel betreten</button>
+</div></div>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = s => s >= 60 ? Math.floor(s / 60) + " min" + (s % 60 ? " " + (s % 60) + " s" : "") : s + " s";
+const clock = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+const RED = "#e1111b", INK = "#16181d";
+
+let id = sessionStorage.getItem("id");
+if (!id) { id = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now();
+           sessionStorage.setItem("id", id); }
+let name = (localStorage.getItem("name") || "").trim();
+$("nameIn").value = name;
+if (name) $("login").style.display = "none";
+function enter() {
+  const v = $("nameIn").value.trim();
+  if (!v) { $("nameIn").focus(); return; }
+  name = v; localStorage.setItem("name", name); $("login").style.display = "none"; start();
+}
+$("go").onclick = enter;
+$("nameIn").onkeydown = e => { if (e.key === "Enter") enter(); };
+if (name) setTimeout(start, 0);
+$("grab").onclick = () => $("sheet").classList.toggle("min");
+
+const map = L.map("map", { zoomControl: false, attributionControl: false }).setView([48.8566, 2.3522], 15);
+L.control.attribution({ position: "topright", prefix: false }).addTo(map);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+
+function makeMarker(label, color, me, pos, acc) {
+  const el = document.createElement("div"); el.className = "mk" + (me ? " me" : "");
+  el.style.setProperty("--c", color);
+  const dot = document.createElement("i"), txt = document.createElement("span");
+  txt.textContent = label; el.append(dot, txt);
+  return {
+    txt,
+    marker: L.marker(pos, { icon: L.divIcon({ html: el, className: "", iconSize: [0, 0] }), interactive: false }).addTo(map),
+    circle: L.circle(pos, { radius: acc, color, weight: 1, fillOpacity: .12, interactive: false }).addTo(map)
+  };
+}
+function moveMarker(m, pos, acc) { m.marker.setLatLng(pos); m.circle.setLatLng(pos).setRadius(acc); }
+
+// Meine Verzögerung: so alt ist die Position, die die anderen von mir sehen
+const slider = $("slider");
+function setDelay(v) {
+  v = +v; slider.value = v;
+  slider.style.setProperty("--p", (v / 900 * 100) + "%");
+  $("dl").textContent = v === 0 ? "Live" : clock(v);
+  $("dl").classList.toggle("live", v === 0);
+  $("note").textContent = v === 0 ? "Die anderen sehen dich in Echtzeit."
+                                  : "Die anderen sehen, wo du vor " + fmt(v) + " warst.";
+  document.querySelectorAll("#presets button").forEach(c => c.classList.toggle("on", +c.dataset.v === v));
+  myDelay = v; send();
+}
+slider.oninput = () => setDelay(slider.value);
+[["Live", 0], ["1 min", 60], ["5 min", 300], ["10 min", 600]].forEach(([t, v]) => {
+  const b = document.createElement("button"); b.textContent = t; b.dataset.v = v;
+  b.onclick = () => setDelay(v); $("presets").append(b);
+});
+document.querySelector("#presets button").classList.add("on");
+
+// GPS
+let myDelay = 0, me = null, last = null, centered = false, started = false;
+function setGps(ok, txt) { $("gdot").className = "dot" + (ok ? " ok" : ""); $("gtxt").textContent = txt; }
+function send() {
+  if (!last) return;
+  fetch("/api/update", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, name, delay: myDelay, ...last }) }).catch(() => {});
+}
+$("loc").onclick = () => { if (me) map.flyTo(me.marker.getLatLng(), 17); };
+
+async function keepAwake() { try { await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && started) keepAwake(); });
+
+function start() {
+  if (started) return; started = true;
+  keepAwake(); setInterval(send, 5000);
+  if (!navigator.geolocation) { setGps(false, "Kein GPS verfügbar"); return; }
+  navigator.geolocation.watchPosition(pos => {
+    const { latitude: lat, longitude: lon, accuracy: acc } = pos.coords;
+    setGps(true, "GPS ±" + Math.round(acc) + " m");
+    if (!me) me = makeMarker("Ich", INK, true, [lat, lon], acc); else moveMarker(me, [lat, lon], acc);
+    if (!centered) { map.setView([lat, lon], 17); centered = true; }
+    last = { lat, lon, acc }; send();
+  }, err => setGps(false, err.code === 1 ? "Standort nicht erlaubt" : "GPS-Fehler"),
+  { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+  setInterval(poll, 2000); poll();
+}
+
+// Andere Spieler (jeder mit seiner eigenen Verzögerung)
+const markers = {};
+async function poll() {
+  if (!started) return;
+  try {
+    const data = await (await fetch("/api/players?me=" + encodeURIComponent(id))).json();
+    const list = data.players, seen = new Set();
+    $("who").replaceChildren();
+    for (const p of list) {
+      seen.add(p.id);
+      const pos = [p.lat, p.lon], label = p.name + " · vor " + fmt(p.age_s);
+      let m = markers[p.id];
+      if (!m) m = markers[p.id] = makeMarker(label, RED, false, pos, p.acc); else moveMarker(m, pos, p.acc);
+      m.txt.textContent = label;
+      const b = document.createElement("button"); b.className = "p";
+      const dot = document.createElement("i"), small = document.createElement("small");
+      small.textContent = clock(p.age_s);
+      b.append(dot, document.createTextNode(p.name), small); b.onclick = () => map.flyTo(pos, 18);
+      $("who").append(b);
+    }
+    for (const k of Object.keys(markers)) if (!seen.has(k)) {
+      map.removeLayer(markers[k].marker); map.removeLayer(markers[k].circle); delete markers[k];
+    }
+    $("cnt").textContent = data.online + " Spieler";
+  } catch (e) {}
+}
+</script>
+</body>
+</html>
